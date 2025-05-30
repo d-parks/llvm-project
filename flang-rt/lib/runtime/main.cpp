@@ -12,6 +12,13 @@
 #include <cfenv>
 #include <cstdio>
 #include <cstdlib>
+#if defined(__x86_64__)
+#include <immintrin.h>
+#endif
+
+extern "C" {
+void RTNAME(feenableexcept)(uint32_t);
+}
 
 static void ConfigureFloatingPoint() {
 #ifdef feclearexcept // a macro in some environments; omit std::
@@ -24,6 +31,11 @@ static void ConfigureFloatingPoint() {
 #else
   std::fesetround(FE_TONEAREST);
 #endif
+
+  if (Fortran::runtime::executionEnvironment.feEnableException) {
+    RTNAME(feenableexcept)(
+        Fortran::runtime::executionEnvironment.feEnableException);
+  }
 }
 
 extern "C" {

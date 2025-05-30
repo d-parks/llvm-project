@@ -63,6 +63,8 @@ struct ExecutionEnvironment {
   bool noStopMessage{false}; // NO_STOP_MESSAGE=1 inhibits "Fortran STOP"
   bool defaultUTF8{false}; // DEFAULT_UTF8
   bool checkPointerDeallocation{true}; // FORT_CHECK_POINTER_DEALLOCATION
+  uint32_t feEnableException{
+      0}; // FORT_FE_ENABLE_EXCEPTION settings mapped to fenv.h FE_<values>
 
   // CUDA related variables
   std::size_t cudaStackLimit{0}; // ACC_OFFLOAD_STACK_SIZE

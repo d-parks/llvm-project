@@ -10,10 +10,14 @@
 #include "environment-default-list.h"
 #include "memory.h"
 #include "flang-rt/runtime/tools.h"
+#include <cfenv>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#if defined(__x86_64__)
+#include <immintrin.h>
+#endif
 
 #ifdef _WIN32
 extern char **_environ;
@@ -165,6 +169,70 @@ void ExecutionEnvironment::Configure(int ac, const char *av[],
           "Fortran runtime: NV_CUDAFOR_DEVICE_IS_MANAGED=%s is invalid; "
           "ignored\n",
           x);
+    }
+  }
+
+  if (auto *x{std::getenv("FORT_FE_ENABLE_EXCEPTION")}) {
+    std::stringstream ssfeEnableException(x);
+    static const char *keywords[]{
+        //  0,           1,      2,         3,         4,     5,          6,
+        "ALL", "DIVBYZERO", "DIVZ", "INEXACT", "INVALID", "INV", "OVERFLOW",
+        //  7,           8,     9,       10,
+        "OVF", "UNDERFLOW", "UNF", "DENORM", nullptr};
+
+    while (true) {
+      std::string arg;
+      std::getline(ssfeEnableException, arg, ',');
+      if (arg.empty()) {
+        break;
+      }
+      switch (IdentifyValue(arg.c_str(), arg.size(), keywords)) {
+      case 0:
+        feEnableException = FE_ALL_EXCEPT;
+#if defined(__x86_64__)
+        // __FE_DENORM might not always be defined for x86_64
+        // Instead use Intel's _MM_EXCEPT_DENORM.
+        // See explanation in exceptions.cpp
+        feEnableException |= _MM_EXCEPT_DENORM;
+#endif
+        break;
+      case 1:
+      case 2:
+        feEnableException |= FE_DIVBYZERO;
+        break;
+      case 3:
+        feEnableException |= FE_INEXACT;
+        break;
+      case 4:
+      case 5:
+        feEnableException |= FE_INVALID;
+        break;
+      case 6:
+      case 7:
+        feEnableException |= FE_OVERFLOW;
+        break;
+      case 8:
+      case 9:
+        feEnableException |= FE_UNDERFLOW;
+        break;
+      case 10:
+#if defined(__x86_64__)
+        // __FE_DENORM might not always be defined for x86_64
+        // Instead use Intel's _MM_EXCEPT_DENORM.
+        // See explanation in exceptions.cpp
+        feEnableException |= _MM_EXCEPT_DENORM;
+#else
+        std::fputs("Fortran runtime: FORT_FE_ENABLE_EXCEPTION=DENORM"
+                   "is only valid for x86_64 processors; ignored\n",
+            stderr);
+#endif
+        break;
+      default:
+        std::fprintf(stderr,
+            "Fortran runtime: FORT_FE_ENABLE_EXCEPTION suboption=%s is invalid"
+            "; ignored\n",
+            arg.c_str());
+      }
     }
   }
 
